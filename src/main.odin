@@ -154,7 +154,6 @@ compute_lighting :: proc(scene: Scene, camera: Camera, point, normal: Vector3f32
                 L := l.position - point
                 t_max := f32(1)
 
-                // Change to true to add shadows (they don't work right now, the screen just becomes blank).
                 shadow_sphere, shadow_t := closest_intersection(scene, Camera{point}, L, 0.001, t_max)
                 if shadow_sphere != nil do continue loop
 
