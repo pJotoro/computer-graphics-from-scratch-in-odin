@@ -11,6 +11,7 @@ Vector2f32 :: linalg.Vector2f32
 Vector3f32 :: linalg.Vector3f32
 Vector4f32 :: linalg.Vector4f32
 INF_F32 :: math.INF_F32
+F32_MAX :: math.F32_MAX
 
 Camera :: struct {
     using position: Vector3f32,
@@ -52,6 +53,7 @@ Sphere :: struct {
     radius: f32,
     color: u32,
     specular: f32,
+    reflection: f32,
 }
 
 Scene :: struct {
@@ -75,55 +77,50 @@ closest_intersection :: proc(scene: Scene, camera: Camera, ray: Vector3f32, t_mi
     return
 }
 
-trace_ray :: proc(scene: Scene, camera: Camera, ray: Vector3f32, t_min: f32, t_max: f32) -> u32 {
+compute_color :: proc(scene: Scene, camera: Camera, point, normal, ray: Vector3f32, sphere: Sphere) -> (color: u32) {
+    r := (sphere.color & 0xFF0000) >> 16
+    g := (sphere.color & 0x00FF00) >> 8
+    b := (sphere.color & 0x0000FF)
+    l := compute_lighting(scene, camera, point, normal, -ray, sphere.specular)
+
+    rl := f32(r) * l
+    rl = clamp(rl, 0, 255)
+    gl := f32(g) * l
+    gl = clamp(gl, 0, 255)
+    bl := f32(b) * l
+    bl = clamp(bl, 0, 255)
+    
+    color = (u32(rl) << 16) | (u32(gl) << 8) | (u32(bl))
+    return
+}
+
+reflect_ray :: proc(ray, normal: Vector3f32) -> Vector3f32 {
+    return 2 * normal * linalg.dot(normal, ray) - ray
+}
+
+trace_ray :: proc(scene: Scene, camera: Camera, ray: Vector3f32, t_min: f32, t_max: f32, recursive_depth: int) -> u32 {
     closest_sphere, closest_t := closest_intersection(scene, camera, ray, t_min, t_max)
-    if closest_sphere == nil do return 0xFFFFFF
+    if closest_sphere == nil do return 0
     c := closest_sphere.(Sphere)
     point := camera.position + closest_t * ray
     normal := linalg.normalize(point - c.position)
-    r := (c.color & 0xFF0000) >> 16
-    g := (c.color & 0x00FF00) >> 8
-    b := (c.color & 0x0000FF)
-    l := compute_lighting(scene, camera, point, normal, -ray, c.specular)
 
-    // NOTE(pJotoro): Change this to true to make specular lighting at high levels cause colors higher than 255 to bleed into the other two. It's a total hack...
-    when false {
-        rl := f32(r) * l
-        rl2 := rl
-        gl := f32(g) * l
-        gl2 := gl
-        bl := f32(b) * l
-        bl2 := bl
+    local_color := compute_color(scene, camera, point, normal, ray, c)
+    
+    r := c.reflection
+    if recursive_depth <= 0 || r <= 0 do return local_color
 
-        if rl > 255 {
-            diff := rl - 255
-            rl2 -= diff
-            gl2 += diff
-            bl2 += diff
-        }
-        if gl > 255 {
-            diff := gl - 255
-            gl2 -= diff
-            rl2 += diff
-            bl2 += diff
-        }
-        if bl > 255 {
-            diff := bl - 255
-            bl2 -= diff
-            gl2 += diff
-            rl2 += diff
-        }
+    R := reflect_ray(-ray, normal)
+    reflected_color := trace_ray(scene, Camera{point}, R, 0.001, INF_F32, recursive_depth - 1)
 
-        return (u32(rl2) << 16) | (u32(gl2) << 8) | (u32(bl2))
-    } else {
-        rl := f32(r) * l
-        rl = clamp(rl, 0, 255)
-        gl := f32(g) * l
-        gl = clamp(gl, 0, 255)
-        bl := f32(b) * l
-        bl = clamp(bl, 0, 255)
-        return (u32(rl) << 16) | (u32(gl) << 8) | (u32(bl))
-    }
+    v18 := transmute([4]u8)local_color
+    v28 := transmute([4]u8)reflected_color
+    v1 := linalg.to_f32(v18)
+    v2 := linalg.to_f32(v28)
+    v3 := v1 * (1 - r) + v2 * r
+    v3 = linalg.clamp(v3, 0, 255)
+    v38 := linalg.to_u8(v3)
+    return transmute(u32)v38
 }
 
 intersect_ray_sphere :: proc(camera: Camera, ray: Vector3f32, sphere: Sphere) -> (t1, t2: f32) {
@@ -212,10 +209,10 @@ main :: proc() {
     
     bitmap := make([]u32, app.width() * app.height())
 
-    sphere1 := Sphere{position = {0, -1, 3}, radius = 1, color = 155 << 16, specular = 500}
-    sphere2 := Sphere{position = {2, 0, 4}, radius = 1, color = 155, specular = 500}
-    sphere3 := Sphere{position = {-2, 0, 4}, radius = 1, color = 155 << 8, specular = 10}
-    sphere4 := Sphere{position = {0, -5001, 0}, radius = 5000, color = (155 << 16) | (155 << 8), specular = 1000}
+    sphere1 := Sphere{position = {0, -1, 3}, radius = 1, color = 100 << 16, specular = 500, reflection = 0.2}
+    sphere2 := Sphere{position = {2, 0, 4}, radius = 1, color = 100, specular = 500, reflection = 0.3}
+    sphere3 := Sphere{position = {-2, 0, 4}, radius = 1, color = 100 << 8, specular = 10, reflection = 0.4}
+    sphere4 := Sphere{position = {0, -5001, 0}, radius = 5000, color = (100 << 16) | (100 << 8), specular = 1000, reflection = 0.5}
 
     spheres := [?]Sphere{sphere1, sphere2, sphere3, sphere4}
 
@@ -235,7 +232,7 @@ main :: proc() {
         for x in 0..<app.width() {
             for y in 0..<app.height() {
                 ray := screen_to_viewport(viewport, x - app.width()/2, y - app.height()/2)
-                color := trace_ray(scene, camera, ray, 1, INF_F32)
+                color := trace_ray(scene, camera, ray, 1, INF_F32, 3)
                 draw_pixel(bitmap, color, x, y)
             }
         }
