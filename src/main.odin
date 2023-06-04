@@ -212,7 +212,7 @@ main :: proc() {
     sphere1 := Sphere{position = {0, -1, 3}, radius = 1, color = 100 << 16, specular = 500, reflection = 0.2}
     sphere2 := Sphere{position = {2, 0, 4}, radius = 1, color = 100, specular = 500, reflection = 0.3}
     sphere3 := Sphere{position = {-2, 0, 4}, radius = 1, color = 100 << 8, specular = 10, reflection = 0.4}
-    sphere4 := Sphere{position = {0, -5001, 0}, radius = 5000, color = (100 << 16) | (100 << 8), specular = 1000, reflection = 0.5}
+    sphere4 := Sphere{position = {0, -5001, 0}, radius = 5000, color = (100 << 16) | (100 << 8), specular = 1000, reflection = 0}
 
     spheres := [?]Sphere{sphere1, sphere2, sphere3, sphere4}
 
