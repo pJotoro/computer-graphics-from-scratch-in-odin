@@ -155,10 +155,8 @@ compute_lighting :: proc(scene: Scene, camera: Camera, point, normal: Vector3f32
                 t_max := f32(1)
 
                 // Change to true to add shadows (they don't work right now, the screen just becomes blank).
-                when false {
-                    shadow_sphere, shadow_t := closest_intersection(scene, Camera{point}, L, 0.001, t_max)
-                    if shadow_sphere != nil do continue loop
-                }
+                shadow_sphere, shadow_t := closest_intersection(scene, Camera{point}, L, 0.001, t_max)
+                if shadow_sphere != nil do continue loop
 
                 // diffuse
                 n_dot_l := linalg.dot(normal, L)
@@ -180,11 +178,8 @@ compute_lighting :: proc(scene: Scene, camera: Camera, point, normal: Vector3f32
                 L := l.direction
                 t_max := INF_F32
 
-                // Change to true to add shadows (they don't work right now, the screen just becomes blank).
-                when false {
-                    shadow_sphere, shadow_t := closest_intersection(scene, Camera{point}, L, 0.001, t_max)
-                    if shadow_sphere != nil do continue loop
-                }
+                shadow_sphere, shadow_t := closest_intersection(scene, Camera{point}, L, 0.001, t_max)
+                if shadow_sphere != nil do continue loop
 
                 // diffuse
                 n_dot_l := linalg.dot(normal, L)
